@@ -2,10 +2,10 @@ import os
 import meraki
 import json
 import time
+import apikey
 
 # Defining your API key as a variable in source code is not recommended
-API_KEY = os.getenv('MK_API_RW_HOME')
-
+API_KEY = apikey.API_KEY_RW
 
 # Instead, use an environment variable as shown under the Usage section
 # @ https://github.com/meraki/dashboard-api-python/
@@ -44,8 +44,10 @@ def setPings(dashboard, fileName, deviceType='any', repeat=2):
                     pingId.write(device["serial"]+",")
                     # write ping id to file
                     pingId.write(ping["pingId"]+"\n")
-                except:
-                    print('ping not available for ' + device["productType"])
+                except Exception as e:
+                    print(e)
+                    print('ping not available for ' +
+                          device["productType"] + ' / ' + device["status"])
     # close file
     pingId.close()
 
