@@ -3,6 +3,7 @@ import meraki
 import json
 import time
 import apikey
+import logging
 
 # Defining your API key as a variable in source code is not recommended
 API_KEY = apikey.API_KEY_RW
@@ -22,6 +23,8 @@ def setPings(dashboard, fileName, deviceType='any', repeat=2):
     response = dashboard.organizations.getOrganizations()
     # open file
     pingId = open(fileName + '.txt', "w")
+
+    logging.info('collecting device serials')
 
     # of each organization of the user
     for org in response:
@@ -45,7 +48,7 @@ def setPings(dashboard, fileName, deviceType='any', repeat=2):
                     # write ping id to file
                     pingId.write(ping["pingId"]+"\n")
                 except Exception as e:
-                    print(e)
+                    logging.error(e)
                     print('ping not available for ' +
                           device["productType"] + ' / ' + device["status"])
     # close file
@@ -91,10 +94,14 @@ if __name__ == "__main__":
     fileName = 'mylist'
     deviceType = 'any'
 
+    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(filename='app.log', filemode='w',
+                        format='%(name)s - %(levelname)s - %(message)s')
+
     dashboard = meraki.DashboardAPI(
         API_KEY, suppress_logging=True)
     response = dashboard.administered.getAdministeredIdentitiesMe()
-    print(response["name"]+' - '+response["email"])
+    logging.debug(response["name"]+' - '+response["email"])
 
     setPings(dashboard, fileName, deviceType, repeat)
     readPings(dashboard, fileName)
