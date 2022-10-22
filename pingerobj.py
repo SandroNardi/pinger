@@ -14,6 +14,9 @@ class Pinger:
     def printresult(self):
         print("Serial " + self.serial + " ID: " + self.pingid)
 
+    def toArray(self):
+        return [self.serial, self.pingid]
+
 
 if __name__ == "__main__":
 
@@ -21,7 +24,7 @@ if __name__ == "__main__":
     tb.header(["serial", " ID"])
 
     ping1 = Pinger("aaaa", "bbbb")
-    tb.add_row(repr(ping1))
+    tb.add_row(ping1.toArray())
     # print(repr(ping1))
-
-    print(tb.draw)
+    #tb.add_row(["serial", " ID"])
+    print(tb.draw())
