@@ -2,11 +2,12 @@ import os
 import meraki
 import json
 import time
-import apikey
 import logging
+from pingerobj import Pinger
+import texttable as tt
 
 # Defining your API key as a variable in source code is not recommended
-API_KEY = apikey.API_KEY_RW
+API_KEY = os.getenv('API_KEY_RW')
 
 # Instead, use an environment variable as shown under the Usage section
 # @ https://github.com/meraki/dashboard-api-python/
@@ -19,10 +20,10 @@ def timer(seconds, printOnScreen=False):
         time.sleep(1)
 
 
-def setPings(dashboard, fileName, deviceType='any', repeat=2):
+def setPings(dashboard, deviceType='any', repeat=2):
+    pings = []
+    p = {}
     response = dashboard.organizations.getOrganizations()
-    # open file
-    pingId = open(fileName + '.txt', "w")
 
     logging.info('collecting device serials')
 
@@ -44,57 +45,83 @@ def setPings(dashboard, fileName, deviceType='any', repeat=2):
                     ping = dashboard.devices.createDeviceLiveToolsPingDevice(
                         device["serial"], count=repeat)
                     # write serial number to file
-                    pingId.write(device["serial"]+",")
-                    # write ping id to file
-                    pingId.write(ping["pingId"]+"\n")
+                    #ping = Pinger(device["name"], device["serial"], ping["pingId"])
+
+                    #p['name'] = device["name"]
+                    #p['serial'] = device["serial"]
+                    #p['pingId'] = ping["pingId"]
+
+                    pings.append(
+                        {"name": device["name"], "serial": device["serial"], "pingId": ping["pingId"]})
+
                 except Exception as e:
-                    logging.error(e)
+                    logging.debug(e)
                     print('ping not available for ' +
                           device["productType"] + ' / ' + device["status"])
-    # close file
-    pingId.close()
+
+    # create and print table with ping set up
+    tb = tt.Texttable()
+    tb.set_cols_dtype(['t', 't', 't'])
+
+    tb.header(["Name", "Serial", " ID"])
+
+    for pi in pings:
+        tb.add_row(pi.values())
+        # print(repr(ping1))
+        #tb.add_row(["serial", " ID"])
+    print(tb.draw())
+    # return set up pings
+    return (pings)
 
 
-def readPings(dashboard, fileName):
-    # read ping results
-    pingId = open(fileName + '.txt', "r")
-    pingResults = open('pingResults.txt', "w")
+def readPings(dashboard, pings):
+
+    tb = tt.Texttable()
+    tb.set_cols_dtype(['t', 't', 't', 't', 't'])
+    tb.header(["Name", "Serial", " ID", "sent/rec", "fail %"])
+
     # for all the line in the file [seria],[pingid]
-    for pingJob in pingId:
-        # strip new line
-        pingJob = pingJob.rstrip('\n')
-        pingObj = pingJob.split(",")
-        # print(x)
-        device = pingObj[0]
-        pId = pingObj[1]
+    for pingJob in pings:
+
+        # print(pingJob)
+        device = pingJob['serial']
+        pId = pingJob['pingId']
 
         pingstatus = dashboard.devices.getDeviceLiveToolsPingDevice(
             device, pId)
-        # print(dashboard.devices.getDevice(device))
-        try:
-            deviceName = dashboard.devices.getDevice(device)['name']
-        except:
-            deviceName = 'UNKNOWN'
+
+        # try:
+        #    deviceName = dashboard.devices.getDevice(device)['name']
+        # except:
+        #    deviceName = 'UNKNOWN'
+
         seconds = 2
         while pingstatus["status"] == 'ready' or pingstatus["status"] == 'running':
-
             timer(seconds)
             seconds = seconds + 2
             pingstatus = dashboard.devices.getDeviceLiveToolsPingDevice(
                 device, pId)
 
-        pingResults.write(
-            deviceName+' , '+pingstatus["status"]+' , '+json.dumps(pingstatus["results"])+'\n')
-    pingId.close()
-    pingResults.close()
+        pingJob['sr'] = str(pingstatus['results']['sent']) + \
+            "/" + str(pingstatus['results']['received'])
+
+        pingJob['loss'] = str(pingstatus['results']
+                              ['loss']['percentage']) + " %"
+
+        tb.add_row(pingJob.values())
+
+    print(tb.draw())
 
 
 if __name__ == "__main__":
     repeat = 3
     fileName = 'mylist'
     deviceType = 'any'
+    #deviceType = 'any'
 
-    logging.basicConfig(level=logging.DEBUG)
+    print(API_KEY)
+
+    logging.basicConfig(level=logging.ERROR)
     logging.basicConfig(filename='app.log', filemode='w',
                         format='%(name)s - %(levelname)s - %(message)s')
 
@@ -103,9 +130,5 @@ if __name__ == "__main__":
     response = dashboard.administered.getAdministeredIdentitiesMe()
     logging.debug(response["name"]+' - '+response["email"])
 
-    setPings(dashboard, fileName, deviceType, repeat)
-    readPings(dashboard, fileName)
-    results = open('pingResults.txt', "r")
-
-    print(results.read())
-    results.close()
+    pings = setPings(dashboard, deviceType, repeat)
+    readPings(dashboard, pings)
