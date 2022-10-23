@@ -3,7 +3,6 @@ import meraki
 import json
 import time
 import logging
-from pingerobj import Pinger
 import texttable as tt
 
 # Defining your API key as a variable in source code is not recommended
@@ -36,7 +35,6 @@ def setPings(dashboard, deviceType='any', repeat=2):
             org["id"], total_pages='all')
         for device in devices:
             # filter by selected type and online
-            # print(device)
             # skip sensors and sig
 
             if (device["productType"] == deviceType or deviceType == 'any') and device["status"] == 'online':
@@ -44,32 +42,31 @@ def setPings(dashboard, deviceType='any', repeat=2):
                     # set up ping for serial
                     ping = dashboard.devices.createDeviceLiveToolsPingDevice(
                         device["serial"], count=repeat)
-                    # write serial number to file
-                    #ping = Pinger(device["name"], device["serial"], ping["pingId"])
 
-                    #p['name'] = device["name"]
-                    #p['serial'] = device["serial"]
-                    #p['pingId'] = ping["pingId"]
-
+                    # write pings anchors
                     pings.append(
                         {"name": device["name"], "serial": device["serial"], "pingId": ping["pingId"]})
 
                 except Exception as e:
-                    logging.debug(e)
-                    print('ping not available for ' +
-                          device["productType"] + ' / ' + device["status"])
+                    logging.info(e)
+                    logging.info('ping not available for ' +
+                                 device["productType"] + ' / ' + device["status"])
 
     # create and print table with ping set up
-    tb = tt.Texttable()
-    tb.set_cols_dtype(['t', 't', 't'])
+    if 1 == 2:
+        tb = tt.Texttable()
+        tb.set_cols_dtype(['t', 't', 't'])
 
-    tb.header(["Name", "Serial", " ID"])
+        tb.header(["Name", "Serial", " ID"])
 
-    for pi in pings:
-        tb.add_row(pi.values())
-        # print(repr(ping1))
-        #tb.add_row(["serial", " ID"])
-    print(tb.draw())
+        for pi in pings:
+            tb.add_row(pi.values())
+            # print(repr(ping1))
+            # tb.add_row(["serial", " ID"])
+        print(tb.draw())
+    else:
+        print("Set up {n} pings, reading results soon...".format(n=len(pings)))
+
     # return set up pings
     return (pings)
 
@@ -90,11 +87,6 @@ def readPings(dashboard, pings):
         pingstatus = dashboard.devices.getDeviceLiveToolsPingDevice(
             device, pId)
 
-        # try:
-        #    deviceName = dashboard.devices.getDevice(device)['name']
-        # except:
-        #    deviceName = 'UNKNOWN'
-
         seconds = 2
         while pingstatus["status"] == 'ready' or pingstatus["status"] == 'running':
             timer(seconds)
@@ -114,21 +106,26 @@ def readPings(dashboard, pings):
 
 
 if __name__ == "__main__":
+    # configure logging
+    logging.basicConfig(filename='pinger.log',
+                        encoding='utf-8', level=logging.CRITICAL)
+
     repeat = 3
     fileName = 'mylist'
     deviceType = 'any'
-    #deviceType = 'any'
 
-    print(API_KEY)
+    # logging API KEY info
+    last_chars = API_KEY[len(API_KEY)-3: len(API_KEY)]
+    logging.info("used API Key - " + '*'*(len(API_KEY)-3) + last_chars)
 
-    logging.basicConfig(level=logging.ERROR)
-    logging.basicConfig(filename='app.log', filemode='w',
-                        format='%(name)s - %(levelname)s - %(message)s')
-
+    # logging api user ID
     dashboard = meraki.DashboardAPI(
         API_KEY, suppress_logging=True)
     response = dashboard.administered.getAdministeredIdentitiesMe()
     logging.debug(response["name"]+' - '+response["email"])
 
+    # set pings
     pings = setPings(dashboard, deviceType, repeat)
+
+    # read results
     readPings(dashboard, pings)
